@@ -1,0 +1,83 @@
+# Maven
+# Build your Java project and run tests with Apache Maven.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/java
+
+trigger: 
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- task: DockerInstaller@0
+  displayName: instalando docker
+  inputs:
+    dockerVersion: '20.10.12'
+
+- task: Bash@3
+  displayName: Logando no registry
+  inputs:
+    targetType: 'inline'
+    script: 'docker login --username=$USER_HEROKU --password=$TOKEN_HEROKU registry.heroku.com'
+  env:
+    USER_HEROKU: $(HEROKU_USER)
+    TOKEN_HEROKU: $(HEROKU_TOKEN)
+
+- task: Maven@3
+  displayName: Compilando com maven
+  inputs:
+    mavenPomFile: 'pom.xml'
+    publishJUnitResults: true
+    testResultsFiles: '**/surefire-reports/TEST-*.xml'
+    javaHomeOption: 'JDKVersion'
+    jdkVersionOption: '1.11'
+    mavenVersionOption: 'Default'
+    mavenAuthenticateFeed: false
+    effectivePomSkip: false
+    sonarQubeRunAnalysis: false
+
+- task: Bash@3
+  displayName: Buildando imagem docker
+  inputs:
+    targetType: 'inline'
+    script: 'docker build -t registry.heroku.com/azure-devops-test/web .'
+
+
+- task: DownloadSecureFile@1
+  displayName: Baixando arquivo Protegido
+  name: arquivoCredenciais
+  inputs:
+   secureFile: .netrc
+
+- task: Bash@3
+  displayName: Copiando arquivo de credenciais para local correto
+  inputs:
+    targetType: 'inline'
+    script: |
+      sudo cp $(arquivoCredenciais.secureFilePath) ~/.netrc
+
+- task: Bash@3
+  displayName: Login no Heroku
+  inputs:
+    targetType: 'inline'
+    script: 'heroku container:login'
+
+- task: Bash@3
+  displayName: Push imagem
+  inputs:
+    targetType: 'inline'
+    script: 'docker push registry.heroku.com/azure-devops-test/web'
+
+- task: Bash@3
+  displayName: Executar release
+  inputs:
+    targetType: 'inline'
+    script: 'heroku container:release web -a azure-devops-test'
+
+- task: Bash@3
+  displayName: Excluindo arquivo de credenciais
+  inputs:
+    targetType: 'inline'
+    script: |
+      sudo rm ~/.netrc

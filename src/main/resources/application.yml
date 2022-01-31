@@ -1,0 +1,20 @@
+server:
+    port: ${PORT:8080}
+    error:
+      include-stacktrace: never
+
+spring:
+  application:
+    name: Brewery
+  data:
+    mongodb:
+      uri: mongodb://brewery:brewery@localhost:27017/breweries?authSource=admin
+
+logging:
+  level:
+    org:
+      hibernate:
+        SQL: INFO
+
+open-brewery:
+  url: https://api.openbrewerydb.org
